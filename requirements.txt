@@ -1,6 +1,6 @@
-pandas
-numpy
-aif360
-scikit-learn
-PyFairnessAI
+pandas==2.2.2
+numpy==2.1.1
+aif360==0.6.1
+scikit-learn==1.5.2
+PyFairnessAI==0.0.1
 
