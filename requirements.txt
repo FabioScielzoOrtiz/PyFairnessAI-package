@@ -4,4 +4,5 @@ aif360==0.6.1 # latest
 scikit-learn==1.5.2 # latest
 PyFairnessAI==0.0.1 # latest
 tensorflow==2.17.0 # latest
+fairlearn=0.10.0 # latest
 
