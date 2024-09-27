@@ -1,4 +1,4 @@
-pandas==2.1.4 #  
+pandas==2.2.2 # latest 
 numpy==1.26.4 # the latest is 2.1.1, but it is not compatible with tensorflow
 aif360==0.6.1 # latest
 scikit-learn==1.5.2 # latest

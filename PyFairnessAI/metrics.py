@@ -271,6 +271,14 @@ def positive_predicted_value_difference(y_true, y_pred, prot_attr, priv_group, p
 
     return PPV_diff
 
+def positive_predicted_value_abs_difference(y_true, y_pred, prot_attr, priv_group, pos_label): # sufficiency
+    
+    PPV_diff = positive_predicted_value_difference(y_true, y_pred, prot_attr, priv_group, pos_label)
+    print(PPV_diff)
+    PPV_abs_diff =  np.abs(PPV_diff)
+
+    return PPV_abs_diff
+
 def positive_predicted_value_ratio(y_true, y_pred, prot_attr, priv_group, pos_label):
 
     PPV_unpriv = positive_predicted_value_unpriv(y_true, y_pred, prot_attr, priv_group, pos_label)
@@ -278,13 +286,6 @@ def positive_predicted_value_ratio(y_true, y_pred, prot_attr, priv_group, pos_la
     PPV_ratio = PPV_unpriv / PPV_priv
 
     return PPV_ratio
-
-def positive_predicted_value_abs_difference(y_true, y_pred, prot_attr, priv_group, pos_label): # sufficiency
-    
-    PPV_diff = positive_predicted_value_difference(y_true, y_pred, prot_attr, priv_group, pos_label)
-    PPV_abs_diff =  np.abs(PPV_diff)
-
-    return PPV_abs_diff
 
 #############################################################################################################################################
 
