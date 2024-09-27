@@ -108,8 +108,8 @@ class RandomizedSearchCVFairness:
                                                                     pos_label=self.pos_label, 
                                                                     scoring=self.fairness_scoring, cv=self.cv)  
                   
-                predictive_metric_iters = cross_val_score(estimator=self.estimator, X=X_train, y=Y_train, 
-                                                          scoring=self.predictive_scoring, cv=inner)
+                predictive_metric_iters = cross_val_score(estimator=self.estimator, X=X, y=y, 
+                                                          scoring=self.predictive_scoring, cv=self.cv)
                 
                 predictive_final_metric = np.mean(predictive_metric_iters)
                  
@@ -131,14 +131,17 @@ class RandomizedSearchCVFairness:
                 predictive_scores_normalized = 1 - predictive_scores_normalized
             if self.fairness_scoring_direction == 'minimize':
                 fairness_scores_normalized = 1 - fairness_scores_normalized
-            combined_scores = predictive_scores_normalized * self.predictive_weight + fairness_scores_normalized * self.fairness_weight
+            if  self.predictive_weight + self.fairness_weight == 1:
+                combined_scores = predictive_scores_normalized * self.predictive_weight + fairness_scores_normalized * self.fairness_weight
+            else:
+                raise ValueError("The sum of predictive_weight and fairness_weight must be 1.")
             for i in range(len(self.results_)):
                 self.results_[i]['combined-score'] = combined_scores[i]
             
             # Optimizing the parameters according to the objective and the scores
             # Obtaining the best params and score, and building a data-frame with the results
             score_list = [self.results_[i][f'{self.objective}-score'] for i in range(len(self.results_))]
-            self.results_df_ = pd.DataFrame(self.results_)
+            self.cv_results_ = pd.DataFrame(self.results_)
 
             scoring_direction_map = {'combined': ('maximize', False),
                                      'fairness': (self.fairness_scoring_direction, None),
@@ -148,15 +151,6 @@ class RandomizedSearchCVFairness:
             opt_function = np.argmax if scoring_direction == 'maximize' else np.argmin
             ascending_value = False if scoring_direction == 'maximize' else True 
             best_score_idx = opt_function(score_list)
-            self.results_df_ = self.results_df_.sort_values(by=f'{self.objective}-score', ascending=ascending_value)
+            self.cv_results_ = self.cv_results_.sort_values(by=f'{self.objective}-score', ascending=ascending_value)
             self.best_params_ = self.results_[best_score_idx]['params']
             self.best_score_ = self.results_[best_score_idx][f'{self.objective}-score']
-
-    def best_params(self):
-        return self.best_params_
-
-    def best_score(self):
-        return self.best_score_
-
-    def results(self):
-        return self.results_df_

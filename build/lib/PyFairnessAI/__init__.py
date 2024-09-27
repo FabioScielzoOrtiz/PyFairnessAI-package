@@ -9,4 +9,4 @@ from .metrics import (statistical_parity_difference, abs_statistical_parity_diff
 from .preprocessing import (ReweighingMetaEstimator)
 from .inprocessing import (AdversarialDebiasingEstimator, ExponentiatedGradientReductionEstimator, GridSearchReductionEstimator, Moment)
 from .postprocessing import (CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMeta)
-from .model_selection import cross_val_score_fairness
+from .model_selection import cross_val_score_fairness, RandomizedSearchCVFairness
