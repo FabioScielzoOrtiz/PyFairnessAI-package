@@ -9,8 +9,9 @@ from fairlearn.reductions import Moment # necessary for ExponentiatedGradientRed
 
 class AdversarialDebiasingEstimator(BaseEstimator, ClassifierMixin):
     
-    def __init__(self, prot_attr, scope_name, adversary_loss_weight, num_epochs, 
-                 batch_size, classifier_num_hidden_units, debias, verbose, random_state):
+    def __init__(self, prot_attr, scope_name='classifier', adversary_loss_weight=0.1, num_epochs=50, 
+                 batch_size=128, classifier_num_hidden_units=200, debias=True, verbose=False, 
+                 random_state=None):
         
         self.prot_attr = prot_attr
         self.scope_name = scope_name
@@ -81,9 +82,9 @@ class AdversarialDebiasingEstimator(BaseEstimator, ClassifierMixin):
 
 class ExponentiatedGradientReductionEstimator(BaseEstimator, ClassifierMixin):
     
-    def __init__(self, prot_attr, estimator, constraints, eps, 
-                 max_iter, nu, eta0, run_linprog_step, drop_prot_attr):
-        
+    def __init__(self, prot_attr, estimator, constraints='ErrorRateParity', eps=0.01, max_iter=50, 
+                 nu=None, eta0=2.0, run_linprog_step=True, drop_prot_attr=True):
+
         self.prot_attr = prot_attr
         self.estimator = estimator
         self.constraints = constraints
@@ -145,8 +146,9 @@ class ExponentiatedGradientReductionEstimator(BaseEstimator, ClassifierMixin):
 
 class GridSearchReductionEstimator(BaseEstimator, ClassifierMixin):
     
-    def __init__(self, prot_attr, estimator, constraints, constraint_weight, grid_size, 
-                       grid_limit, grid, drop_prot_attr, loss, min_val, max_val):
+    def __init__(self, prot_attr, estimator, constraints='ErrorRateParity', constraint_weight=0.5, 
+                       grid_size=10, grid_limit=2.0, grid=None, drop_prot_attr=True, loss='ZeroOne', 
+                       min_val=None, max_val=None):
         
         self.prot_attr = prot_attr
         self.estimator = estimator
