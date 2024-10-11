@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 
 from aif360.sklearn.datasets import fetch_german
 
@@ -25,17 +26,193 @@ from PyFairnessAI.postprocessing import CalibratedEqualizedOdds, RejectOptionCla
 
 import time 
 
+from itertools import chain
+
+pd.set_option('display.max_colwidth', None)
+
 import warnings
 warnings.filterwarnings("ignore")
 
-#########################################################################################################
+###################################################################################################################
+###################################################################################################################
+
+def get_key_preprocessing_grid(model, fairness_processors, preprocessing_grid):
+
+    if any(x in model for x in fairness_processors['multi']): # Fairness multi processor involved in the model
+        key1 = model + '__estimator' + '__estimator'
+        key3 = None
+        preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()
+        if any(x in model for x in fairness_processors['pre_in']):
+            key2 = model + '__estimator'
+        elif any(x in model for x in fairness_processors['pre_post']):
+            key2 = model + '__estimator' + '__postprocessor'
+        elif any(x in model for x in fairness_processors['post_pre']):
+            key2 = model + '__postprocessor'   
+        elif any(x in model for x in fairness_processors['post_in']):
+           key2 = model + '__estimator'
+           key3 = model + '__postprocessor'   
+    else:
+        key2 = key3 = None
+        if any(x in model for x in fairness_processors['pre'] + fairness_processors['in']): # Fairness pre or in processor involved in the model
+            if model == 'adv_debiasing':
+                key1 = model
+            else:
+                key1 = model + '__estimator' 
+            preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()
+        elif any(x in model for x in fairness_processors['post']): # Fairness post processor involved in the model
+            key1 = model + '__estimator' 
+            key2 = model + '__postprocessor'
+            preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()       
+        else: # No fairness processor involved
+            key1 = model
+            preprocessing_grid_ = preprocessing_grid['not_fairness_processor'].copy()
+    
+    return key1, key2, key3, preprocessing_grid_
+
+# %%
+def get_model_param_grid(model, key):
+
+    if 'log_reg' in model:
+
+        param_grid = {f'{key}__penalty': ['l1', 'l2'],
+                      f'{key}__C':  [0.01, 0.1, 1, 10, 30, 50, 75, 100],
+                      f'{key}__class_weight': ['balanced', None],
+                      f'{key}__threshold': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+                    }
+    
+    elif 'XGB' in model:
+
+        param_grid = {f'{key}__max_depth': [10, 20, 30, 40, 50, 70, 100],
+                      f'{key}__reg_lambda': np.arange(0, 1, 0.05),
+                      f'{key}__n_estimators':  [30, 50, 70, 100],
+                      f'{key}__eta': np.arange(0, 0.3, 0.02),
+                      f'{key}__alpha': np.arange(0.2, 1, 0.01)
+                    }
+
+    elif 'LGB' in model:
+
+        param_grid = {f'{key}__max_depth': np.arange(2, 50),
+                      f'{key}__num_leaves':  np.arange(2, 50),
+                      f'{key}__n_estimators': [30, 50, 70, 100, 120, 150],
+                      f'{key}__learning_rate':  np.arange(0.001, 0.1, 0.003),
+                      f'{key}__lambda_l1': np.arange(0.001, 1, 0.005),
+                      f'{key}__lambda_l2': np.arange(0.001, 1, 0.005),
+                      f'{key}__min_split_gain':  np.arange(0.001, 0.01, 0.001),
+                      f'{key}__min_child_weight': np.arange(5, 50),
+                      f'{key}__lambda_feature_fraction':  np.arange(0.1, 0.95, 0.05)                                                                                                           
+                      }
+    
+    elif 'RF' in model:
+        
+        param_grid = {f'{key}__max_depth': np.arange(2, 15),
+                      f'{key}__min_samples_leaf':  np.arange(2, 15),
+                      f'{key}__min_samples_split':  np.arange(2, 15),
+                      f'{key}__n_estimators': [30, 50, 70, 100, 120],
+                      f'{key}__criterion': ['gini', 'entropy']                                                                                                 
+                    }
+        
+    elif 'adv_debiasing' in model:
+        
+        param_grid = {f'{key}__adversary_loss_weight': np.arange(0.01, 1, 0.03),
+                      f'{key}__num_epochs':  np.arange(10, 100),
+                      f'{key}__batch_size':  np.arange(70, 200),
+                      f'{key}__classifier_num_hidden_units': np.arange(70, 300),
+                      f'{key}__debias': [True, False]   
+                    }
+        
+    return param_grid
+
+###################################################################################################################
+
+def get_processor_param_grid(processor, key):
+
+    if processor == 'expGR':
+
+        param_grid = {f'{key}__constraints': ['DemographicParity', 'EqualizedOdds', 
+                                              'TruePositiveRateParity', 'ErrorRateParity'],
+                      f'{key}__eps': np.arange(0.001, 0.1, 0.003),
+                      f'{key}__max_iter': np.arange(20, 100, 5),
+                      f'{key}__eta0': np.arange(0.1, 4, 0.2),
+                      f'{key}__drop_prot_attr': [True, False],
+                    }   
+        
+    elif processor == 'GSR':
+
+        param_grid = {f'{key}__constraints': ['DemographicParity', 'EqualizedOdds', 
+                                              'TruePositiveRateParity', 'ErrorRateParity'],
+                    f'{key}__constraint_weight': np.arange(0.01, 1, 0.05),
+                    f'{key}__grid_size': np.arange(5, 50, 5),
+                    f'{key}__grid_limit': np.arange(1, 10),
+                    f'{key}__loss': ['ZeroOne', 'Square', 'Absolute'],                                
+                    f'{key}__drop_prot_attr': [True, False],
+                    }  
+    
+    elif processor == 'CEO':
+
+        param_grid = {f'{key}__cost_constraint': ['fpr', 'fnr', 'weighted']}
+
+    elif processor == 'ROC':
+
+        param_grid = {f'{key}__threshold': np.arange(0.05, 0.5, 0.03), # must be between 0-0.5
+                      f'{key}__margin': np.arange(0.01, 0.05, 0.005) # must be between 0-0.05
+                    }
+        
+    return param_grid
+
+###################################################################################################################
+
+def get_pipeline_param_grid(model, fairness_processors, preprocessing_grid):
+
+    key1, key2, key3, preprocessing_grid_ = get_key_preprocessing_grid(model, fairness_processors, preprocessing_grid)
+    param_grid = preprocessing_grid_.copy()
+    param_grid.update(get_model_param_grid(model, key=key1)) 
+    
+    if any(x in model for x in fairness_processors['multi']): # Multi processor involved
+
+        if 'reweighing_' in model: 
+
+            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2)) 
+        
+        elif '_reweighing' in model: 
+
+            param_grid.update(get_processor_param_grid(processor=model.split('_')[-2], key=key2)) 
+
+        else:
+
+            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2))
+            param_grid.update(get_processor_param_grid(processor=model.split('_')[-2], key=key3))
+
+    else: # Not multi processor (no fairness processor or pre/in/post processor)
+                
+        if any(x in model for x in fairness_processors['in']): # in processor  
+            if model != 'adv_debiasing':
+                param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=model))
+
+        elif any(x in model for x in fairness_processors['post']): # post processor 
+
+            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2))
+    
+    return param_grid
+
+###################################################################################################################
+
+def n_iter(model):
+
+    if 'XGB' in model:
+        return 10
+    elif 'RF' in model:
+        return 15
+    else:
+        return 30
+
+###################################################################################################################
 
 X, y = fetch_german(binary_age=True)
 response_favorable_label = 1 # 'good' before encoding
 sens_variable = 'age' # name of sensitive variable
 X[sens_variable] = X.apply(lambda row: 1 if row[sens_variable] >= 25 else 0, axis=1).astype('category')
 sens_priv_group = 1 # >= 25 years
-A = X[sens_variable] # sensitive variable / protected attribute
+
 quant_predictors = [col for col in X.columns if X.dtypes[col] != 'category']
 cat_predictors = [col for col in X.columns if col not in quant_predictors]  
 predictors = quant_predictors + cat_predictors # X.columns
@@ -47,13 +224,10 @@ y = pd.Series(encoder.fit_transform(y.to_numpy().reshape(-1, 1)).flatten())
 X.index = X[sens_variable] 
 y.index = X[sens_variable]  
 
-#########################################################################################################
-
 random_state = 123
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.85, random_state=random_state, stratify=y)
 inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
-
-#########################################################################################################
 
 # Set up TensorFlow session (required by AdversarialDebiasingEstimator)
 tf_session = tf.compat.v1.Session
@@ -61,7 +235,9 @@ tf_session = tf.compat.v1.Session
 tf.compat.v1.disable_eager_execution()
 tf.random.set_seed(random_state)
 
-#########################################################################################################
+###################################################################################################################
+
+models, pipelines, fairness_processors, preprocessing_grid = {}, {}, {}, {}
 
 quant_pipeline = Pipeline([
     ('imputer', Imputer()),
@@ -76,9 +252,7 @@ cat_pipeline = Pipeline([
 quant_cat_processing = ColumnTransformer(transformers=[('quant', quant_pipeline, quant_predictors),
                                                        ('cat', cat_pipeline, cat_predictors)])
 
-#########################################################################################################
-
-models, pipelines = {}, {}
+###################################################################################################################
 
 ceo = CalibratedEqualizedOdds(prot_attr=sens_variable, random_state=random_state) # Fairnes post-processor
 roc = RejectOptionClassifier(prot_attr=sens_variable) # Fairnes post-processor
@@ -164,23 +338,23 @@ models['XGB_ROC_GSR'] = PostProcessingMeta(estimator=models['XGB_GSR'], postproc
 models['LGB_ROC_GSR'] = PostProcessingMeta(estimator=models['LGB_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
 models['RF_ROC_GSR'] = PostProcessingMeta(estimator=models['RF_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
 
-#########################################################################################################
+###################################################################################################################
 
-fairness_pre_processors_names = ['reweighing']
-fairness_in_processors_names = ['expGR', 'GSR', 'adv_debiasing'] 
-fairness_post_processors_names = ['CEO', 'ROC']
-fairness_pre_in_processors_names = ['reweighing_expGR', 'reweighing_GSR']
-fairness_pre_post_processors_names = ['reweighing_CEO', 'reweighing_ROC']
-fairness_post_pre_processors_names = ['CEO_reweighing', 'ROC_reweighing']
-fairness_post_in_processors_names = ['CEO_expGR', 'ROC_expGR', 'CEO_GSR', 'ROC_GSR']
-fairness_multi_processors_names = fairness_pre_in_processors_names + fairness_pre_post_processors_names + fairness_post_pre_processors_names + fairness_post_in_processors_names
-fairness_processors_names = fairness_pre_processors_names + fairness_in_processors_names + fairness_post_processors_names + fairness_multi_processors_names
+fairness_processors['pre'] = ['reweighing']
+fairness_processors['in'] = ['expGR', 'GSR', 'adv_debiasing'] 
+fairness_processors['post'] = ['CEO', 'ROC']
+fairness_processors['pre_in'] = ['reweighing_expGR', 'reweighing_GSR']
+fairness_processors['pre_post'] = ['reweighing_CEO', 'reweighing_ROC']
+fairness_processors['post_pre'] = ['CEO_reweighing', 'ROC_reweighing']
+fairness_processors['post_in'] = ['CEO_expGR', 'ROC_expGR', 'CEO_GSR', 'ROC_GSR']
+fairness_processors['multi'] = fairness_processors['pre_in'] + fairness_processors['pre_post'] + fairness_processors['post_pre'] + fairness_processors['post_in']
+fairness_processors['all'] = list(chain(*[fairness_processors[x] for x in fairness_processors.keys()]))
 
-#########################################################################################################
+###################################################################################################################
 
 for key, model in models.items():
 
-    if  any(x in key for x in fairness_processors_names): # model[key] involves fairness processor
+    if  any(x in key for x in fairness_processors['all']): # model[key] involves fairness processor
 
         pipelines[key] = Pipeline([
                 # Fairness processors need a Pandas df X as input to read the sens_variable_name
@@ -197,10 +371,8 @@ for key, model in models.items():
                 (key, model) 
                 ])
 
-#########################################################################################################
- 
-preprocessing_grid = {}
-
+###################################################################################################################
+        
 preprocessing_grid['not_fairness_processor'] = {'preprocessing__quant__scaler__apply': [True, False],
                                                 'preprocessing__quant__scaler__method': ['standard', 'min-max'],
                                                 'preprocessing__cat__encoder__method': ['ordinal', 'one-hot'],
@@ -214,177 +386,7 @@ preprocessing_grid['not_fairness_processor'] = {'preprocessing__quant__scaler__a
 preprocessing_grid['fairness_processor'] = {'__'.join([k.split('__')[0]] + ['column_transformer'] + k.split('__')[1:]) : v 
                                             for k, v in preprocessing_grid['not_fairness_processor'].items()}
 
-#########################################################################################################
-
-def get_key_preprocessing_grid(model):
-
-    if any(x in model for x in fairness_multi_processors_names): # Fairness multi processor involved in the model
-        key1 = model + '__estimator' + '__estimator'
-        key3 = None
-        preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()
-        if any(x in model for x in fairness_pre_in_processors_names):
-            key2 = model + '__estimator'
-        elif any(x in model for x in fairness_pre_post_processors_names):
-            key2 = model + '__estimator' + '__postprocessor'
-        elif any(x in model for x in fairness_post_pre_processors_names):
-            key2 = model + '__postprocessor'   
-        elif any(x in model for x in fairness_post_in_processors_names):
-           key2 = model + '__estimator'
-           key3 = model + '__postprocessor'   
-    else:
-        key2 = key3 = None
-        if any(x in model for x in fairness_pre_processors_names + fairness_in_processors_names): # Fairness pre or in processor involved in the model
-            if model == 'adv_debiasing':
-                key1 = model
-            else:
-                key1 = model + '__estimator' 
-            preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()
-        elif any(x in model for x in fairness_post_processors_names): # Fairness post processor involved in the model
-            key1 = model + '__estimator' 
-            key2 = model + '__postprocessor'
-            preprocessing_grid_ = preprocessing_grid['fairness_processor'].copy()       
-        else: # No fairness processor involved
-            key1 = model
-            preprocessing_grid_ = preprocessing_grid['not_fairness_processor'].copy()
-    
-    return key1, key2, key3, preprocessing_grid_
-
-#########################################################################################################
-
-def get_model_param_grid(model, key):
-
-    if 'log_reg' in model:
-
-        param_grid = {f'{key}__penalty': ['l1', 'l2'],
-                      f'{key}__C':  [0.01, 0.1, 1, 10, 30, 50, 75, 100],
-                      f'{key}__class_weight': ['balanced', None],
-                      f'{key}__threshold': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-                    }
-    
-    elif 'XGB' in model:
-
-        param_grid = {f'{key}__max_depth': [10, 20, 30, 40, 50, 70, 100],
-                      f'{key}__reg_lambda': np.arange(0, 1, 0.05),
-                      f'{key}__n_estimators':  [30, 50, 70, 100],
-                      f'{key}__eta': np.arange(0, 0.3, 0.02),
-                      f'{key}__alpha': np.arange(0.2, 1, 0.01)
-                    }
-
-    elif 'LGB' in model:
-
-        param_grid = {f'{key}__max_depth': np.arange(2, 50),
-                      f'{key}__num_leaves':  np.arange(2, 50),
-                      f'{key}__n_estimators': [30, 50, 70, 100, 120, 150],
-                      f'{key}__learning_rate':  np.arange(0.001, 0.1, 0.003),
-                      f'{key}__lambda_l1': np.arange(0.001, 1, 0.005),
-                      f'{key}__lambda_l2': np.arange(0.001, 1, 0.005),
-                      f'{key}__min_split_gain':  np.arange(0.001, 0.01, 0.001),
-                      f'{key}__min_child_weight': np.arange(5, 50),
-                      f'{key}__lambda_feature_fraction':  np.arange(0.1, 0.95, 0.05)                                                                                                           
-                      }
-    
-    elif 'RF' in model:
-        
-        param_grid = {f'{key}__max_depth': np.arange(2, 15),
-                      f'{key}__min_samples_leaf':  np.arange(2, 15),
-                      f'{key}__min_samples_split':  np.arange(2, 15),
-                      f'{key}__n_estimators': [30, 50, 70, 100, 120],
-                      f'{key}__criterion': ['gini', 'entropy']                                                                                                 
-                    }
-        
-    elif 'adv_debiasing' in model:
-        
-        param_grid = {f'{key}__adversary_loss_weight': np.arange(0.01, 1, 0.03),
-                      f'{key}__num_epochs':  np.arange(10, 100),
-                      f'{key}__batch_size':  np.arange(70, 200),
-                      f'{key}__classifier_num_hidden_units': np.arange(70, 300),
-                      f'{key}__debias': [True, False]   
-                    }
-        
-    return param_grid
-
-#########################################################################################################
-
-def get_processor_param_grid(processor, key):
-
-    if processor == 'expGR':
-
-        param_grid = {f'{key}__constraints': ['DemographicParity', 'EqualizedOdds', 
-                                        'TruePositiveRateParity', 'ErrorRateParity'],
-                      f'{key}__eps': np.arange(0.001, 0.1, 0.003),
-                      f'{key}__max_iter': np.arange(20, 100, 5),
-                      f'{key}__eta0': np.arange(0.1, 4, 0.2),
-                      f'{key}__drop_prot_attr': [True, False],
-                    }   
-        
-    elif processor == 'GSR':
-
-        param_grid = {f'{key}__constraints': ['DemographicParity', 'EqualizedOdds', 
-                                            'TruePositiveRateParity', 'ErrorRateParity'],
-                     f'{key}__constraint_weight': np.arange(0.01, 1, 0.05),
-                     f'{key}__grid_size': np.arange(5, 50, 5),
-                     f'{key}__grid_limit': np.arange(1, 10),
-                     f'{key}__loss': ['ZeroOne', 'Square', 'Absolute'],                                
-                     f'{key}__drop_prot_attr': [True, False],
-                    }  
-    
-    elif processor == 'CEO':
-
-        param_grid = {f'{key}__cost_constraint': ['fpr', 'fnr', 'weighted']}
-
-    elif processor == 'ROC':
-
-        param_grid = {f'{key}__threshold': np.arange(0.05, 0.5, 0.03), # must be between 0-0.5
-                      f'{key}__margin': np.arange(0.01, 0.05, 0.005) # must be between 0-0.05
-                    }
-        
-    return param_grid
-
-#########################################################################################################
-
-def get_pipeline_param_grid(model):
-
-    key1, key2, key3, preprocessing_grid_ = get_key_preprocessing_grid(model)
-    param_grid = preprocessing_grid_.copy()
-    param_grid.update(get_model_param_grid(model, key=key1)) 
-    
-    if any(x in model for x in fairness_multi_processors_names): # Multi processor involved
-
-        if 'reweighing_' in model: 
-
-            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2)) 
-        
-        elif '_reweighing' in model: 
-
-            param_grid.update(get_processor_param_grid(processor=model.split('_')[-2], key=key2)) 
-
-        else:
-
-            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2))
-            param_grid.update(get_processor_param_grid(processor=model.split('_')[-2], key=key3))
-
-    else: # Not multi processor (no fairness processor or pre/in/post processor)
-                
-        if any(x in model for x in fairness_in_processors_names): # in processor  
-            if model != 'adv_debiasing':
-                param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=model))
-
-        elif any(x in model for x in fairness_post_processors_names): # post processor 
-
-            param_grid.update(get_processor_param_grid(processor=model.split('_')[-1], key=key2))
-    
-    return param_grid
-
-def n_iter(model):
-
-    if 'XGB' in model:
-        return 5
-    elif 'RF' in model:
-        return 10
-    else:
-        return 20
-
-#########################################################################################################
+###################################################################################################################
 
 param_grid, best_results_list = {}, []
 
@@ -392,7 +394,7 @@ for model in pipelines.keys():
 
     print(model)
 
-    param_grid[model] = get_pipeline_param_grid(model)
+    param_grid[model] = get_pipeline_param_grid(model, fairness_processors, preprocessing_grid)
 
     fairness_random_search = RandomizedSearchCVFairness(estimator=pipelines[model], 
                                                         param_distributions=param_grid[model], 
@@ -415,16 +417,24 @@ for model in pipelines.keys():
     best_result_dict.update(dict(fairness_random_search.cv_results_.iloc[0]))
     best_results_list.append(best_result_dict)
 
-#########################################################################################################
+###################################################################################################################
 
 best_results = pd.DataFrame(best_results_list)
 best_results['combined-score'] = combined_score(predictive_scores=best_results['predictive-score'], 
-                                               fairness_scores=best_results['fairness-score'], 
-                                               predictive_scoring_direction='maximize', 
-                                               fairness_scoring_direction='minimize',
-                                               predictive_weight=0.5, fairness_weight=0.5)
+                                                fairness_scores=best_results['fairness-score'], 
+                                                predictive_scoring_direction='maximize', 
+                                                fairness_scoring_direction='minimize',
+                                                predictive_weight=0.5, fairness_weight=0.5)
 best_results = best_results.sort_values(by='combined-score', ascending=False)
 
+# Define the results path
+results_path = r'C:\Users\fscielzo\Documents\IBiDat\Fairness AI\PyFairnessAI-package\notebooks\Project-notebooks\results\best_results_fairness_workflow.csv'
 
-best_results.to_csv(r'notebooks\Project-notebooks\results\best_results_fairness_workflow.csv')
-print('Results saved as CSV')
+# Check if the file already exists
+if not os.path.exists(results_path):
+    # If the file doesn't exist, save the CSV
+    best_results.to_csv(results_path)
+    print(f"File saved at: {results_path}")
+else:
+    print(f"File already exists at: {results_path}")
+###################################################################################################################
