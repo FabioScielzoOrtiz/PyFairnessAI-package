@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="PyFairnessAI",
-    version="0.0.26",
+    version="0.0.29",
     author="Fabio Scielzo Ortiz",
     author_email="fabio.scielzoortiz@gmail.com",
     description="A Python package for fairness in AI and Machine Learning.",

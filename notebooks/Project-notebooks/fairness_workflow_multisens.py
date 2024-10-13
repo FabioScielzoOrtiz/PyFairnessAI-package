@@ -21,9 +21,9 @@ from PyMachineLearning.models import LogisticRegressionThreshold
 from PyFairnessAI.model_selection import RandomizedSearchCVFairness, combined_score
 from PyFairnessAI.preprocessing import ReweighingMetaEstimator
 from PyFairnessAI.inprocessing import (AdversarialDebiasingEstimator, 
-                                       ExponentiatedGradientReductionEstimator, 
-                                       GridSearchReductionEstimator, Moment)
-from PyFairnessAI.postprocessing import CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMeta
+                                       ExponentiatedGradientReductionMetaEstimator, 
+                                       GridSearchReductionMetaEstimator, Moment)
+from PyFairnessAI.postprocessing import CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMetaEstimator
 
 import time 
 
@@ -292,24 +292,24 @@ models['RF_reweighing'] = ReweighingMetaEstimator(estimator=models['RF'], prot_a
 
 models['adv_debiasing'] = AdversarialDebiasingEstimator(prot_attr=sens_variable, scope_name='classifier', random_state=random_state) # Fairness In-Processor
 
-models['log_reg_expGR'] = ExponentiatedGradientReductionEstimator(prot_attr=sens_variable, estimator=models['log_reg']) # Fairness In-Processor
-models['XGB_expGR'] = ExponentiatedGradientReductionEstimator(prot_attr=sens_variable, estimator=models['XGB']) # Fairness In-Processor
-models['LGB_expGR'] = ExponentiatedGradientReductionEstimator(prot_attr=sens_variable, estimator=models['LGB']) # Fairness In-Processor
-models['RF_expGR'] = ExponentiatedGradientReductionEstimator(prot_attr=sens_variable, estimator=models['RF']) # Fairness In-Processor
-models['log_reg_GSR'] = GridSearchReductionEstimator(prot_attr=sens_variable, estimator=models['log_reg']) # Fairness In-Processor
-models['XGB_GSR'] = GridSearchReductionEstimator(prot_attr=sens_variable, estimator=models['XGB']) # Fairness In-Processor
-models['LGB_GSR'] = GridSearchReductionEstimator(prot_attr=sens_variable, estimator=models['LGB']) # Fairness In-Processor
-models['RF_GSR'] = GridSearchReductionEstimator(prot_attr=sens_variable, estimator=models['RF']) # Fairness In-Processor
+models['log_reg_expGR'] = ExponentiatedGradientReductionMetaEstimator(prot_attr=sens_variable, estimator=models['log_reg']) # Fairness In-Processor
+models['XGB_expGR'] = ExponentiatedGradientReductionMetaEstimator(prot_attr=sens_variable, estimator=models['XGB']) # Fairness In-Processor
+models['LGB_expGR'] = ExponentiatedGradientReductionMetaEstimator(prot_attr=sens_variable, estimator=models['LGB']) # Fairness In-Processor
+models['RF_expGR'] = ExponentiatedGradientReductionMetaEstimator(prot_attr=sens_variable, estimator=models['RF']) # Fairness In-Processor
+models['log_reg_GSR'] = GridSearchReductionMetaEstimator(prot_attr=sens_variable, estimator=models['log_reg']) # Fairness In-Processor
+models['XGB_GSR'] = GridSearchReductionMetaEstimator(prot_attr=sens_variable, estimator=models['XGB']) # Fairness In-Processor
+models['LGB_GSR'] = GridSearchReductionMetaEstimator(prot_attr=sens_variable, estimator=models['LGB']) # Fairness In-Processor
+models['RF_GSR'] = GridSearchReductionMetaEstimator(prot_attr=sens_variable, estimator=models['RF']) # Fairness In-Processor
 
-models['log_reg_CEO'] = PostProcessingMeta(estimator=models['log_reg'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
-models['XGB_CEO'] = PostProcessingMeta(estimator=models['XGB'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
-models['LGB_CEO'] = PostProcessingMeta(estimator=models['LGB'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
-models['RF_CEO'] = PostProcessingMeta(estimator=models['RF'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
+models['log_reg_CEO'] = PostProcessingMetaEstimator(estimator=models['log_reg'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
+models['XGB_CEO'] = PostProcessingMetaEstimator(estimator=models['XGB'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
+models['LGB_CEO'] = PostProcessingMetaEstimator(estimator=models['LGB'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
+models['RF_CEO'] = PostProcessingMetaEstimator(estimator=models['RF'], postprocessor=ceo, prefit=False, val_size=0.25) # Fairnes post-processor
 
-models['log_reg_ROC'] = PostProcessingMeta(estimator=models['log_reg'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
-models['XGB_ROC'] = PostProcessingMeta(estimator=models['XGB'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
-models['LGB_ROC'] = PostProcessingMeta(estimator=models['LGB'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
-models['RF_ROC'] = PostProcessingMeta(estimator=models['RF'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
+models['log_reg_ROC'] = PostProcessingMetaEstimator(estimator=models['log_reg'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
+models['XGB_ROC'] = PostProcessingMetaEstimator(estimator=models['XGB'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
+models['LGB_ROC'] = PostProcessingMetaEstimator(estimator=models['LGB'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
+models['RF_ROC'] = PostProcessingMetaEstimator(estimator=models['RF'], postprocessor=roc, prefit=False, val_size=0.25) # Fairnes post-processor
 
 models['log_reg_reweighing_expGR'] = ReweighingMetaEstimator(estimator=models['log_reg_expGR'], prot_attr=sens_variable) # pre + in
 models['XGB_reweighing_expGR'] = ReweighingMetaEstimator(estimator=models['XGB_expGR'], prot_attr=sens_variable) # pre + in
@@ -331,35 +331,35 @@ models['XGB_reweighing_ROC'] = ReweighingMetaEstimator(estimator=models['XGB_ROC
 models['LGB_reweighing_ROC'] = ReweighingMetaEstimator(estimator=models['LGB_ROC'], prot_attr=sens_variable) # pre + post
 models['RF_reweighing_ROC'] = ReweighingMetaEstimator(estimator=models['RF_ROC'], prot_attr=sens_variable) # pre + post
 
-models['log_reg_CEO_reweighing'] = PostProcessingMeta(estimator=models['log_reg_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
-models['XGB_CEO_reweighing'] = PostProcessingMeta(estimator=models['XGB_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
-models['LGB_CEO_reweighing'] = PostProcessingMeta(estimator=models['LGB_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
-models['RF_CEO_reweighing'] = PostProcessingMeta(estimator=models['RF_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
+models['log_reg_CEO_reweighing'] = PostProcessingMetaEstimator(estimator=models['log_reg_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
+models['XGB_CEO_reweighing'] = PostProcessingMetaEstimator(estimator=models['XGB_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
+models['LGB_CEO_reweighing'] = PostProcessingMetaEstimator(estimator=models['LGB_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
+models['RF_CEO_reweighing'] = PostProcessingMetaEstimator(estimator=models['RF_reweighing'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + pre
 
-models['log_reg_ROC_reweighing'] = PostProcessingMeta(estimator=models['log_reg_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
-models['XGB_ROC_reweighing'] = PostProcessingMeta(estimator=models['XGB_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
-models['LGB_ROC_reweighing'] = PostProcessingMeta(estimator=models['LGB_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
-models['RF_ROC_reweighing'] = PostProcessingMeta(estimator=models['RF_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
+models['log_reg_ROC_reweighing'] = PostProcessingMetaEstimator(estimator=models['log_reg_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
+models['XGB_ROC_reweighing'] = PostProcessingMetaEstimator(estimator=models['XGB_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
+models['LGB_ROC_reweighing'] = PostProcessingMetaEstimator(estimator=models['LGB_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
+models['RF_ROC_reweighing'] = PostProcessingMetaEstimator(estimator=models['RF_reweighing'], postprocessor=roc, prefit=False, val_size=0.25)  # post + pre
 
-models['log_reg_CEO_expGR'] = PostProcessingMeta(estimator=models['log_reg_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['XGB_CEO_expGR'] = PostProcessingMeta(estimator=models['XGB_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['LGB_CEO_expGR'] = PostProcessingMeta(estimator=models['LGB_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['RF_CEO_expGR'] = PostProcessingMeta(estimator=models['RF_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['log_reg_CEO_expGR'] = PostProcessingMetaEstimator(estimator=models['log_reg_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['XGB_CEO_expGR'] = PostProcessingMetaEstimator(estimator=models['XGB_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['LGB_CEO_expGR'] = PostProcessingMetaEstimator(estimator=models['LGB_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['RF_CEO_expGR'] = PostProcessingMetaEstimator(estimator=models['RF_expGR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
 
-models['log_reg_ROC_expGR'] = PostProcessingMeta(estimator=models['log_reg_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['XGB_ROC_expGR'] = PostProcessingMeta(estimator=models['XGB_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['LGB_ROC_expGR'] = PostProcessingMeta(estimator=models['LGB_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['RF_ROC_expGR'] = PostProcessingMeta(estimator=models['RF_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['log_reg_ROC_expGR'] = PostProcessingMetaEstimator(estimator=models['log_reg_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['XGB_ROC_expGR'] = PostProcessingMetaEstimator(estimator=models['XGB_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['LGB_ROC_expGR'] = PostProcessingMetaEstimator(estimator=models['LGB_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['RF_ROC_expGR'] = PostProcessingMetaEstimator(estimator=models['RF_expGR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
 
-models['log_reg_CEO_GSR'] = PostProcessingMeta(estimator=models['log_reg_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['XGB_CEO_GSR'] = PostProcessingMeta(estimator=models['XGB_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['LGB_CEO_GSR'] = PostProcessingMeta(estimator=models['LGB_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
-models['RF_CEO_GSR'] = PostProcessingMeta(estimator=models['RF_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['log_reg_CEO_GSR'] = PostProcessingMetaEstimator(estimator=models['log_reg_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['XGB_CEO_GSR'] = PostProcessingMetaEstimator(estimator=models['XGB_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['LGB_CEO_GSR'] = PostProcessingMetaEstimator(estimator=models['LGB_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
+models['RF_CEO_GSR'] = PostProcessingMetaEstimator(estimator=models['RF_GSR'], postprocessor=ceo, prefit=False, val_size=0.25)  # post + in
 
-models['log_reg_ROC_GSR'] = PostProcessingMeta(estimator=models['log_reg_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['XGB_ROC_GSR'] = PostProcessingMeta(estimator=models['XGB_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['LGB_ROC_GSR'] = PostProcessingMeta(estimator=models['LGB_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
-models['RF_ROC_GSR'] = PostProcessingMeta(estimator=models['RF_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['log_reg_ROC_GSR'] = PostProcessingMetaEstimator(estimator=models['log_reg_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['XGB_ROC_GSR'] = PostProcessingMetaEstimator(estimator=models['XGB_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['LGB_ROC_GSR'] = PostProcessingMetaEstimator(estimator=models['LGB_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
+models['RF_ROC_GSR'] = PostProcessingMetaEstimator(estimator=models['RF_GSR'], postprocessor=roc, prefit=False, val_size=0.25)  # post + in
 
 fairness_processors['pre'] = ['reweighing']
 fairness_processors['in'] = ['expGR', 'GSR', 'adv_debiasing'] 
@@ -405,7 +405,7 @@ preprocessing_grid['fairness_processor'] = {'__'.join([k.split('__')[0]] + ['col
 
 param_grid, best_results_list = {}, []
 
-for model in ['XGB_ROC_GSR']: #pipelines.keys():
+for model in pipelines.keys():
 
     print(model)
 

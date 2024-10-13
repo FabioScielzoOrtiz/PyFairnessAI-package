@@ -80,7 +80,7 @@ class AdversarialDebiasingEstimator(BaseEstimator, ClassifierMixin):
 
 ###############################################################################################################
 
-class ExponentiatedGradientReductionEstimator(BaseEstimator, ClassifierMixin):
+class ExponentiatedGradientReductionMetaEstimator(BaseEstimator, ClassifierMixin):
     
     def __init__(self, prot_attr, estimator, constraints='ErrorRateParity', eps=0.01, max_iter=50, 
                  nu=None, eta0=2.0, run_linprog_step=True, drop_prot_attr=True):
@@ -144,7 +144,7 @@ class ExponentiatedGradientReductionEstimator(BaseEstimator, ClassifierMixin):
 
 ###############################################################################################################
 
-class GridSearchReductionEstimator(BaseEstimator, ClassifierMixin):
+class GridSearchReductionMetaEstimator(BaseEstimator, ClassifierMixin):
     
     def __init__(self, prot_attr, estimator, constraints='ErrorRateParity', constraint_weight=0.5, 
                        grid_size=10, grid_limit=2.0, grid=None, drop_prot_attr=True, loss='ZeroOne', 

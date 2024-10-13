@@ -7,6 +7,6 @@ from .metrics import (statistical_parity_difference, abs_statistical_parity_diff
                       true_positive_rate_ratio, true_negative_rate_ratio, positive_predicted_value_difference,
                       positive_predicted_value_ratio, positive_predicted_value_abs_difference) 
 from .preprocessing import (ReweighingMetaEstimator)
-from .inprocessing import (AdversarialDebiasingEstimator, ExponentiatedGradientReductionEstimator, GridSearchReductionEstimator, Moment)
-from .postprocessing import (CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMeta)
+from .inprocessing import (AdversarialDebiasingEstimator, ExponentiatedGradientReductionMetaEstimator, GridSearchReductionMetaEstimator, Moment)
+from .postprocessing import (CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMetaEstimator)
 from .model_selection import cross_val_score_fairness, RandomizedSearchCVFairness
