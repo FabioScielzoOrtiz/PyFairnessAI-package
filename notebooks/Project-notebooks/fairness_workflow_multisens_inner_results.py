@@ -1,15 +1,21 @@
 import numpy as np
 import pandas as pd
-import os 
+import os
+import sys
+import ast 
 import argparse
+import time 
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from aif360.sklearn.datasets import fetch_german
 
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
@@ -24,8 +30,7 @@ from PyFairnessAI.inprocessing import (AdversarialDebiasingEstimator,
                                        ExponentiatedGradientReductionMetaEstimator, 
                                        GridSearchReductionMetaEstimator, Moment)
 from PyFairnessAI.postprocessing import CalibratedEqualizedOdds, RejectOptionClassifier, PostProcessingMetaEstimator
-
-import time 
+from PyFairnessAI.metrics import average_odds_error
 
 from itertools import chain
 
@@ -34,7 +39,7 @@ pd.set_option('display.max_colwidth', None)
 import warnings
 warnings.filterwarnings("ignore")
 
-#######################################################################################################################
+#############################################################################################################################
 
 def get_key_preprocessing_grid(model, fairness_processors, preprocessing_grid):
 
@@ -69,7 +74,7 @@ def get_key_preprocessing_grid(model, fairness_processors, preprocessing_grid):
     
     return key1, key2, key3, preprocessing_grid_
 
-#######################################################################################################################
+###################################################################################################################
 
 def get_model_param_grid(model, key):
 
@@ -96,11 +101,11 @@ def get_model_param_grid(model, key):
                       f'{key}__num_leaves':  np.arange(2, 50),
                       f'{key}__n_estimators': [30, 50, 70, 100, 120, 150],
                       f'{key}__learning_rate':  np.arange(0.001, 0.1, 0.003),
-                      f'{key}__lambda_l1': np.arange(0.001, 1, 0.005),
-                      f'{key}__lambda_l2': np.arange(0.001, 1, 0.005),
+                      f'{key}__reg_alpha': np.arange(0.001, 1, 0.005),
+                      f'{key}__reg_lambda': np.arange(0.001, 1, 0.005),
                       f'{key}__min_split_gain':  np.arange(0.001, 0.01, 0.001),
                       f'{key}__min_child_weight': np.arange(5, 50),
-                      f'{key}__lambda_feature_fraction':  np.arange(0.1, 0.95, 0.05)                                                                                                           
+                      f'{key}__feature_fraction':  np.arange(0.1, 0.95, 0.05)                                                                                                           
                       }
     
     elif 'RF' in model:
@@ -123,8 +128,7 @@ def get_model_param_grid(model, key):
         
     return param_grid
 
-
-#######################################################################################################################
+###################################################################################################################
 
 def get_processor_param_grid(processor, key):
 
@@ -161,7 +165,7 @@ def get_processor_param_grid(processor, key):
         
     return param_grid
 
-#######################################################################################################################
+###################################################################################################################
 
 def get_pipeline_param_grid(model, fairness_processors, preprocessing_grid):
 
@@ -196,7 +200,7 @@ def get_pipeline_param_grid(model, fairness_processors, preprocessing_grid):
     
     return param_grid
 
-#######################################################################################################################
+###################################################################################################################
 
 def n_iter(model):
 
@@ -205,21 +209,20 @@ def n_iter(model):
     elif 'RF' in model:
         return 15
     else:
-        return 30
+        return 50
 
-#######################################################################################################################
+###################################################################################################################
 
 # Argument parsing
 parser = argparse.ArgumentParser(description='Process the sum_rule parameter.')
 parser.add_argument('--sum_rule', choices=['AND', 'OR'], required=True, help='The sum rule to apply: AND or OR')
 args = parser.parse_args()
 
-#######################################################################################################################
-#######################################################################################################################
+###################################################################################################################
 
-X, y = fetch_german(binary_age=False)
-X.index = range(len(X))
+# Preparing the data
 
+X, y = fetch_german(binary_age=True)
 response_favorable_label = 1 # 'good' before encoding
 sens_variable_1 = 'age' # name of first sensitive variable
 sens_variable_2 = 'sex' # name of second sensitive variable
@@ -229,38 +232,50 @@ X[sens_variable_2] = encoder.fit_transform(X[sens_variable_2].to_numpy().reshape
 X[sens_variable_2] = X[sens_variable_2].astype('category')
 sens_1_priv_group = 1 # 1: >= 25 years, 0: < 25 years
 sens_2_priv_group = 1 # 1: male, 0: female
+y = pd.Series(encoder.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()) # good: 1 , bad: 0
 
+# Defining the multi sensitive variable based on the individual ones ('age', 'sex').
+# Two possible sum rules are considered here: AND, OR
+# AND: the privileged group in the multi sens variable is defined as the intersection of the privileged groups of the individual sens variables.
+# OR: the privileged group in the multi sens variable is defined as the union of the privileged groups of the individual sens variables.
 sens_variable = 'age_sex'
 if args.sum_rule == 'AND': 
     X[sens_variable] = X.apply(lambda row: 1 if row[sens_variable_1] == sens_1_priv_group and row[sens_variable_2] == sens_2_priv_group else 0, axis=1)
 elif args.sum_rule == 'OR':
     X[sens_variable] = X.apply(lambda row: 1 if row[sens_variable_1] == sens_1_priv_group or row[sens_variable_2] == sens_2_priv_group else 0, axis=1)
 
-sens_priv_group = 1 # 1 (priv group): '>= 25' years AND/OR 'male', 0 (unpriv group): otherwise (else)
-
+sens_priv_group = 1 # 1 (priv group): '>= 25' years AND/OR 'male', 0 (unpriv group): otherwise ('< 25' years OR/AND 'female')
 X[sens_variable] = X[sens_variable].astype('category') # necessary to work properly with some aif360 objects
+
+# Removing the individual sensitive variables 
+X = X.drop([sens_variable_1, sens_variable_2], axis=1)
+
+# Indexing with the sens_variable is needed for fairness post-processing
+X.index = X[sens_variable] 
+y.index = X[sens_variable]  
+# A is needed for some fairness metric objects
+A = X[sens_variable]
 
 quant_predictors = [col for col in X.columns if X.dtypes[col] != 'category']
 cat_predictors = [col for col in X.columns if col not in quant_predictors]  
 predictors = quant_predictors + cat_predictors # X.columns
 
-encoder = Encoder(method='ordinal')
-y = pd.Series(encoder.fit_transform(y.to_numpy().reshape(-1, 1)).flatten())
-
-# needed for fairness post-processing
-X.index = X[sens_variable] 
-y.index = X[sens_variable]  
+###################################################################################################################
+# Outer evaluation method
 
 random_state = 123
+X_train, X_test, y_train, y_test, A_train, A_test = train_test_split(X, y, A, train_size=0.75, random_state=random_state, stratify=y)
+# A_test is needed for outer evaluation (estimation of future performance) with respect to fairness 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.85, random_state=random_state, stratify=y)
+###################################################################################################################
+
+# ### Inner evaluation method
+
 inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
 
-# Set up TensorFlow session (required by AdversarialDebiasingEstimator)
-tf_session = tf.compat.v1.Session
-# disable_eager_execution is required as well by TensorFlow
-tf.compat.v1.disable_eager_execution()
-tf.random.set_seed(random_state)
+###################################################################################################################
+
+# Defining pipelines
 
 models, pipelines, fairness_processors, preprocessing_grid = {}, {}, {}, {}
 
@@ -277,12 +292,19 @@ cat_pipeline = Pipeline([
 quant_cat_processing = ColumnTransformer(transformers=[('quant', quant_pipeline, quant_predictors),
                                                        ('cat', cat_pipeline, cat_predictors)])
 
+
+# Set up TensorFlow session (required by AdversarialDebiasingEstimator)
+tf_session = tf.compat.v1.Session
+# disable_eager_execution is required as well by TensorFlow
+tf.compat.v1.disable_eager_execution()
+tf.random.set_seed(random_state)
+
 ceo = CalibratedEqualizedOdds(prot_attr=sens_variable, random_state=random_state) # Fairnes post-processor
 roc = RejectOptionClassifier(prot_attr=sens_variable) # Fairnes post-processor
 
 models['log_reg'] = LogisticRegressionThreshold(solver='liblinear', random_state=random_state)
 models['XGB'] = XGBClassifier(random_state=random_state)
-models['LGB'] = LGBMClassifier(random_state=random_state)
+models['LGB'] = LGBMClassifier(random_state=random_state,verbosity=-1)
 models['RF'] = RandomForestClassifier(random_state=random_state)
 
 models['log_reg_reweighing'] = ReweighingMetaEstimator(estimator=models['log_reg'], prot_attr=sens_variable) # Fairness Pre-Processor
@@ -389,7 +411,11 @@ for key, model in models.items():
                 ('preprocessing', quant_cat_processing),
                 (key, model) 
                 ])
-        
+
+###################################################################################################################
+
+# Defining grids
+
 preprocessing_grid['not_fairness_processor'] = {'preprocessing__quant__scaler__apply': [True, False],
                                                 'preprocessing__quant__scaler__method': ['standard', 'min-max'],
                                                 'preprocessing__cat__encoder__method': ['ordinal', 'one-hot'],
@@ -403,13 +429,17 @@ preprocessing_grid['not_fairness_processor'] = {'preprocessing__quant__scaler__a
 preprocessing_grid['fairness_processor'] = {'__'.join([k.split('__')[0]] + ['column_transformer'] + k.split('__')[1:]) : v 
                                             for k, v in preprocessing_grid['not_fairness_processor'].items()}
 
-param_grid, best_results_list = {}, []
+param_grid = {}
+for model in pipelines.keys():
+    param_grid[model] = get_pipeline_param_grid(model, fairness_processors, preprocessing_grid)
+
+###################################################################################################################
+
+# Applying inner evaluation
+
+best_results_list = []
 
 for model in pipelines.keys():
-
-    print(model)
-
-    param_grid[model] = get_pipeline_param_grid(model, fairness_processors, preprocessing_grid)
 
     fairness_random_search = RandomizedSearchCVFairness(estimator=pipelines[model], 
                                                         param_distributions=param_grid[model], 
@@ -441,9 +471,8 @@ best_results['combined-score'] = combined_score(predictive_scores=best_results['
                                                 predictive_weight=0.5, fairness_weight=0.5)
 best_results = best_results.sort_values(by='combined-score', ascending=False)
 
-# Define the results path
-results_path = rf'C:\Users\fscielzo\Documents\IBiDat\Fairness AI\PyFairnessAI-package\notebooks\Project-notebooks\results\best_results_fairness_workflow_multisens_{args.sum_rule}.csv'
-
+file_name = f'best_results_fairness_workflow_multisens_{args.sum_rule}'
+results_path = rf'C:\Users\fscielzo\Documents\IBiDat\Fairness AI\PyFairnessAI-package\notebooks\Project-notebooks\results\{file_name}.csv'
 # Check if the file already exists
 if not os.path.exists(results_path):
     # If the file doesn't exist, save the CSV
@@ -452,3 +481,4 @@ if not os.path.exists(results_path):
 else:
     print(f"File already exists at: {results_path}")
 
+###################################################################################################################

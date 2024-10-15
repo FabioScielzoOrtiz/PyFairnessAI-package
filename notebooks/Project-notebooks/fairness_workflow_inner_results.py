@@ -207,7 +207,7 @@ def n_iter(model):
     elif 'RF' in model:
         return 15
     else:
-        return 30
+        return 50
 
 ###################################################################################################################
 ###################################################################################################################
@@ -217,7 +217,8 @@ def n_iter(model):
 X, y = fetch_german(binary_age=True)
 response_favorable_label = 1 # 'good' before encoding
 sens_variable = 'age' # name of sensitive variable
-X[sens_variable] = X.apply(lambda row: 1 if row[sens_variable] >= 25 else 0, axis=1).astype('category')
+X[sens_variable] = X.apply(lambda row: 1 if row[sens_variable] >= 25 else 0, axis=1) 
+X[sens_variable] = X[sens_variable].astype('category') # necessary to work properly with some aif360 objects
 sens_priv_group = 1 # >= 25 years
 encoder = Encoder(method='ordinal')
 y = pd.Series(encoder.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()) # good: 1 , bad: 0
@@ -234,7 +235,7 @@ predictors = quant_predictors + cat_predictors # X.columns
 # Outer evaluation method
 
 random_state = 123
-X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.85, random_state=random_state, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.75, random_state=random_state, stratify=y)
 
 ###################################################################################################################
 
@@ -443,7 +444,8 @@ best_results['combined-score'] = combined_score(predictive_scores=best_results['
                                                 predictive_weight=0.5, fairness_weight=0.5)
 best_results = best_results.sort_values(by='combined-score', ascending=False)
 
-results_path = r'C:\Users\fscielzo\Documents\IBiDat\Fairness AI\PyFairnessAI-package\notebooks\Project-notebooks\results\best_results_fairness_workflow.csv'
+file_name = 'best_results_fairness_workflow'
+results_path = rf'C:\Users\fscielzo\Documents\IBiDat\Fairness AI\PyFairnessAI-package\notebooks\Project-notebooks\results\{file_name}.csv'
 # Check if the file already exists
 if not os.path.exists(results_path):
     # If the file doesn't exist, save the CSV
