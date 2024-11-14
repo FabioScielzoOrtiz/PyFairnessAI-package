@@ -1,0 +1,11 @@
+pandas==2.2.2 # latest 
+numpy==1.26.4 # the latest is 2.1.1, but it is not compatible with tensorflow
+aif360==0.6.1 # latest
+scikit-learn==1.5.2 # latest
+PyFairnessAI==0.0.29 # latest
+tensorflow==2.17.0 # latest
+fairlearn==0.10.0 # latest
+PyMachineLearning==0.0.22 # latest
+optuna
+xgboost
+lightgbm
